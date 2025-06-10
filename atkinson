@@ -41,14 +41,18 @@ function dither(img, algo) {
     let ctx = cnvas.getContext('2d')
     ctx.drawImage(img, 0, 0)
     let imagedata = ctx.getImageData(0, 0, img.width, img.height)
-    let r = algo(imagedata)
-    ctx.putImageData(r, 0, 0)
-    return cnvas.toDataURL()
+    ctx.putImageData(algo(imagedata), 0, 0)
+    return cnvas.createPNGStream()
 }
 
-function print(data_url) {
-    let s = data_url.slice('data:image/png;base64,'.length)
-    process.stdout.write(Buffer.from(s, 'base64'))
+function print(stream) {
+    return new Promise( (resolve, reject) => {
+        process.stdout.on('error', e => {
+            if (e.code !== 'EPIPE') reject(e)
+        })
+        stream.on('end', resolve)
+        stream.pipe(process.stdout)
+    })
 }
 
 function err(...msg) { console.error(...msg); process.exit(1) }
@@ -58,5 +62,5 @@ let url = process.argv[2]
 if (!url) err('Usage: atkinson url')
 
 canvas.loadImage(url).then( r => dither(r, atkinson)).then(print).catch(e => {
-    err(DEBUG ? e : e.message)
+    err(DEBUG ? e : `Error: ${e.message}`)
 })
