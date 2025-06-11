@@ -1,14 +1,27 @@
 #!/usr/bin/env node
 
 import canvas from 'canvas'
-import atkinson from './index.js'
+import * as atkinson from './index.js'
 
-function dither(img, algo) {
+function dither(img, algo, opt) {
     let cnvas = canvas.createCanvas(img.width, img.height)
     let ctx = cnvas.getContext('2d')
     ctx.drawImage(img, 0, 0)
     let imagedata = ctx.getImageData(0, 0, img.width, img.height)
-    ctx.putImageData(algo(imagedata), 0, 0)
+
+    let p
+    if (opt.verbose) {
+        p = new atkinson.Progress(imagedata)
+        p.addEventListener('update', () => {
+            let percent = Math.round((p.current / p.max) * 100)
+            process.stderr.write(`\r${percent}%`)
+        })
+        p.addEventListener('done', () => {
+            process.stderr.write('\r')
+        })
+    }
+    ctx.putImageData(algo(imagedata, p), 0, 0)
+
     return cnvas.createPNGStream()
 }
 
@@ -24,9 +37,10 @@ function print(stream) {
 function err(...msg) { console.error(...msg); process.exit(1) }
 
 let DEBUG = !!process.env.DEBUG
+let VERBOSE = process.env.V !== '0'
 let url = process.argv[2]
-if (!url) err('Usage: atkinson url')
+if (!url) err('Usage: [V=0] atkinson url')
 
-canvas.loadImage(url).then( r => dither(r, atkinson)).then(print).catch(e => {
-    err(DEBUG ? e : `Error: ${e.message}`)
-})
+canvas.loadImage(url).then( r => {
+    return dither(r, atkinson.dithering, {verbose: VERBOSE})
+}).then(print).catch(e => err(DEBUG ? e : `Error: ${e.message}`))
