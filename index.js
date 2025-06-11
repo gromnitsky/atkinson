@@ -10,9 +10,12 @@ export class Progress extends EventTarget {
     }
 
     force_update(value) {
+        if (this.done) return
+
         let evt = new CustomEvent("update", { detail: value })
         this.dispatchEvent(evt)
         if (value === this.max) {
+            this.done = true
             evt = new CustomEvent("done")
             this.dispatchEvent(evt)
         }
